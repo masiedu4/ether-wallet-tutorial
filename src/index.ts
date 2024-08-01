@@ -19,7 +19,7 @@ type AdvanceRequestHandler = (
 
 const wallet = new Wallet();
 
-const EtherPortal = `0xFfdbe43d4c855BF7e0f105c400A50857f53AB044`;
+const ERC721Portal = `0x237F8DD094C0e47f4236f12b4Fa01d6Dae89fb87`;
 
 const rollupServer = process.env.ROLLUP_HTTP_SERVER_URL;
 console.log("HTTP rollup_server url is " + rollupServer);
@@ -30,31 +30,33 @@ const handleAdvance: AdvanceRequestHandler = async (data) => {
   const sender = data["metadata"]["msg_sender"];
   const payload = data.payload;
 
-  if (sender.toLowerCase() === EtherPortal.toLowerCase()) {
+  if (sender.toLowerCase() === ERC721Portal.toLowerCase()) {
     // Handle deposit
-    const deposit = wallet.depositEther(payload);
+    const deposit = wallet.processErc721Deposit(payload);
     await sendNotice(stringToHex(deposit));
   } else {
     // Handle transfer or withdrawal
     try {
-      const { operation, from, to, amount } = JSON.parse(hexToString(payload));
+      const { operation, erc721, from, to, tokenId } = JSON.parse(hexToString(payload));
 
       if (operation === "transfer") {
-        const transfer = wallet.transferEther(
+        const transfer = wallet.transferErc721(
           getAddress(from as Address),
           getAddress(to as Address),
-          BigInt(amount)
+          getAddress(erc721 as Address),
+          parseInt(tokenId)
         );
         console.log(transfer);
         await sendNotice(stringToHex(transfer));
       } else if (operation === "withdraw") {
-        const withdraw = wallet.withdrawEther(
-          getAddress(EtherPortal as Address),
+        const withdraw = wallet.withdrawErc721(
+          getAddress(ERC721Portal as Address),
           getAddress(from as Address),
-          BigInt(amount)
+          getAddress(erc721 as Address),
+          parseInt(tokenId)
         );
         console.log(withdraw);
-        await sendVoucher({ payload: amount, destination: from });
+        await sendVoucher(JSON.parse(withdraw));
       } else {
         console.log("Unknown operation");
       }
@@ -70,9 +72,21 @@ const handleInspect: InspectRequestHandler = async (data) => {
   console.log("Received inspect request data " + JSON.stringify(data));
 
   try {
-    const address = hexToString(data.payload);
+    const payloadString = hexToString(data.payload);
+    const address = '0x' + payloadString.slice(0, 40);
+    const erc721 = '0x' + payloadString.slice(40, 80);
+
     const balance = wallet.getBalance(getAddress(address as Address));
-    await sendReport({ payload: toHex(balance) });
+    let erc721balance = balance.getErc721Tokens(erc721 as Address);
+
+    if (erc721balance === undefined) {
+      throw new Error("ERC721 balance is undefined");
+    }
+
+    // Convert Set<number> to Uint8Array
+    const erc721balanceArray = new Uint8Array(Array.from(erc721balance));
+
+    await sendReport({ payload: toHex(erc721balanceArray) });
   } catch (error) {
     console.error("Error processing inspect payload:", error);
   }
