@@ -40,7 +40,7 @@ export class Wallet {
   }
 
   withdrawEther(
-    rollupAddress: Address,
+    application: Address,
     address: Address,
     amount: bigint
   ): Voucher {
@@ -48,10 +48,9 @@ export class Wallet {
 
     if (balance.getEther() >= amount) {
       balance.decreaseEther(amount);
-      const voucher = this.encodeWithdrawCall(rollupAddress, address, amount);
+      const voucher = this.encodeWithdrawCall(application, address, amount);
 
       console.log("Voucher created succesfully", voucher);
-      
 
       return voucher;
     } else {
@@ -62,18 +61,25 @@ export class Wallet {
   transferEther(from: Address, to: Address, amount: bigint): string {
     const fromBalance = this.getOrCreateBalance(from);
     const toBalance = this.getOrCreateBalance(to);
-    fromBalance.decreaseEther(amount);
-    toBalance.increaseEther(amount);
-    console.log(
-      `After transfer, balance for ${from} is ${fromBalance.getEther()}`
-    );
-    console.log(`After transfer, balance for ${to} is ${toBalance.getEther()}`);
-    return JSON.stringify({
-      type: "etherTransfer",
-      from,
-      to,
-      amount: amount.toString(),
-    });
+
+    if (fromBalance.getEther() >= amount) {
+      fromBalance.decreaseEther(amount);
+      toBalance.increaseEther(amount);
+      console.log(
+        `After transfer, balance for ${from} is ${fromBalance.getEther()}`
+      );
+      console.log(
+        `After transfer, balance for ${to} is ${toBalance.getEther()}`
+      );
+      return JSON.stringify({
+        type: "etherTransfer",
+        from,
+        to,
+        amount: amount.toString(),
+      });
+    } else {
+      throw Error("Insufficient amount");
+    }
   }
 
   private parseDepositPayload(payload: string): [Address, bigint] {

@@ -35,6 +35,7 @@ const handleAdvance: AdvanceRequestHandler = async (data) => {
 
   if (sender.toLowerCase() === dAppAddressRelay.toLowerCase()) {
     dAppAddress = data.payload;
+    return 'accept'
   }
 
   if (sender.toLowerCase() === EtherPortal.toLowerCase()) {
@@ -52,7 +53,7 @@ const handleAdvance: AdvanceRequestHandler = async (data) => {
           getAddress(to as Address),
           BigInt(amount)
         );
-        console.log(transfer);
+        await createNotice({ payload: stringToHex(transfer) });
       } else if (operation === "withdraw") {
         const voucher = wallet.withdrawEther(
           getAddress(dAppAddress as Address),
@@ -60,7 +61,7 @@ const handleAdvance: AdvanceRequestHandler = async (data) => {
           BigInt(amount)
         );
 
-        await sendVoucher(voucher);
+        await createVoucher(voucher);
       } else {
         console.log("Unknown operation");
       }
@@ -99,7 +100,7 @@ const createNotice = async (payload: Notice) => {
   });
 };
 
-const sendVoucher = async (payload: Voucher) => {
+const createVoucher = async (payload: Voucher) => {
   await fetch(`${rollupServer}/voucher`, {
     method: "POST",
     headers: {
